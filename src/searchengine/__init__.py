@@ -1,9 +1,10 @@
 #coding:utf-8
 import urllib2
-#import BeautifulSoup
 from BeautifulSoup import *
 from urlparse import urljoin
 import mysql.connector
+import nn
+mynet=nn.searchnet('searchindex')
 
 # Create a list of words to ignore
 #ignorewords={'the':1,'of':1,'to':1,'and':1,'a':1,'in':1,'is':1,'it':1}
@@ -12,7 +13,7 @@ ignorewords=set(['the','of','to','and','a','in','is','it'])
 class crawler:
     # Initialize the crawler with the name of database
     def __init__(self,dbname):
-        self.cnx = mysql.connector.connect(user='root', password='555321',
+        self.cnx = mysql.connector.connect(user='root', password='',
                                            host='127.0.0.1',
                                            database=dbname)
         self.cursor = self.cnx.cursor()
@@ -183,7 +184,7 @@ class crawler:
 
 class searcher:
     def __init__(self,dbname):
-        self.cnx = mysql.connector.connect(user='root', password='555321',
+        self.cnx = mysql.connector.connect(user='root', password='',
                                            host='127.0.0.1',
                                            database=dbname)
         self.cursor = self.cnx.cursor()
@@ -245,13 +246,15 @@ class searcher:
 
     def query(self,q):
         rows,wordids=self.getmatchrows(q)
-        if rows==None:print 'not found',wordids
+        if rows==None:
+            print 'not found',wordids
+            return None,None
         else:
             scores=self.getscoredlist(rows,wordids)
             rankedscores=sorted([(score,url) for (url,score) in scores.items()],reverse=1)
             for (score,urlid) in rankedscores[0:10]:
                 print '%f\t%s' % (score,self.geturlname(urlid))
-                #return wordids,[r[1] for r in rankedscores[0:10]]
+            return wordids,[r[1] for r in rankedscores[0:10]]
 
     def normalizescores(self,scores,smallIsBetter=0):
         vsmall=0.00001 # Avoid division by zero errors
@@ -324,8 +327,15 @@ class searcher:
         maxscore=max(linkscores.values())
         normalizedscores=dict([(u,float(l)/max(maxscore,0.00001)) for (u,l) in linkscores.items()])
         return normalizedscores
-
     
+    # 6、利用神经网络
+    def nnscore(self,rows,wordids):
+        # Get unique URL IDs as an ordered list
+        urlids=[urlid for urlid in dict([(row[0],1) for row in rows])]
+        nnres=mynet.getresult(wordids,urlids)
+        scores=dict([(urlids[i],nnres[i]) for i in range(len(urlids))])
+        return self.normalizescores(scores)
+
     
     
     

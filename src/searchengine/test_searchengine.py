@@ -4,6 +4,8 @@ import urllib2
 from BeautifulSoup import *
 from urlparse import urljoin
 import mysql.connector
+import codecs  
+
 
 print 'start>>>'
 # Create a list of words to ignore
@@ -13,7 +15,7 @@ ignorewords=set(['the','of','to','and','a','in','is','it'])
 class crawler:
     # Initialize the crawler with the name of database
     def __init__(self,dbname):
-        self.cnx = mysql.connector.connect(user='root', password='555321',
+        self.cnx = mysql.connector.connect(user='root', password='',
                                            host='127.0.0.1',
                                            database=dbname)
         self.cursor = self.cnx.cursor()
@@ -54,9 +56,13 @@ class crawler:
     
     # Extract the text from an HTML page (no tags)
     def gettextonly(self,soup):
+        # If a tag contains more than one thing, then it’s not clear what .string should refer to, 
+        # so .string is defined to be None:
         v=soup.string
+        print 'soup(link).string:',v
         if v==None:   
             c=soup.contents
+            print 'soup(link).contents:',c
             resulttext=''
             for t in c:
                 subtext=self.gettextonly(t)
@@ -105,50 +111,44 @@ class crawler:
     # first search to the given depth, indexing pages
     # as we go
     def crawl(self,pages,depth=2):
+        f1 = open('C:\Users\Administrator\Desktop\openurl.txt','w')
+        f2 = codecs.open('C:\Users\Administrator\Desktop\soup.txt','w',"utf8")
+        f3 = codecs.open('C:\Users\Administrator\Desktop\soup_tex.txt','a',"ascii")
         for i in range(depth):
             newpages=set()
             j = 0  # 限制爬取的网页个数
             for page in pages:
                 if j>=4 : break  
                 j+=1
-                try:
-                    c=urllib2.urlopen(page)
-                except:
-                    print "Could not open %s" % page
-                    continue
-                
-                soup=BeautifulSoup(c.read())
-                self.addtoindex(page,soup)
+                c=urllib2.urlopen(page)
+                #print 'urlopen(page):',c
+                c_read = c.read()
+                f1.write(c_read+'\n')
+                soup=BeautifulSoup(c_read)
+                #print 'soup:',soup
+                #self.addtoindex(page,soup)
                 links=soup('a')
+                print 'links',links
                 for link in links:
+                    print 'link:',link
                     if ('href' in dict(link.attrs)):
                         url=urljoin(page,link['href'])
                         if url.find("'")!=-1: continue
                         url=url.split('#')[0]  # remove location portion
-                        print 'url:',url
-                        print 'link:',link
-                        if url[0:4]=='http' and not self.isindexed(url):
+                        #print 'url:',url
+                        #print 'link:',link
+                        if url[0:4]=='http': #and not self.isindexed(url):
                             newpages.add(url)
                         linkText=self.gettextonly(link)
-                        self.addlinkref(page,url,linkText)
-                self.dbcommit()
+                        print 'linkText:\n',linkText
+                        #f3.write(linkText+'\n')
+                        #self.addlinkref(page,url,linkText)
+                #self.dbcommit()
+            f1.close();f2.close();f3.close()
             pages=newpages
 
-    
-    # Create the database tables
-    def createindextables(self):
-            self.cursor.execute('create table urllist(id INT NOT NULL AUTO_INCREMENT,url varchar(250),PRIMARY KEY(id))')
-            self.cursor.execute('create table wordlist(id INT NOT NULL AUTO_INCREMENT,word varchar(50),PRIMARY KEY(id))')
-            self.cursor.execute('create table wordlocation(id INT NOT NULL AUTO_INCREMENT,urlid int,wordid int,location bigint,PRIMARY KEY(id))')
-            self.cursor.execute('create table link(id INT NOT NULL AUTO_INCREMENT,fromid int,toid int,PRIMARY KEY(id))')
-            self.cursor.execute('create table linkwords(id INT NOT NULL AUTO_INCREMENT,wordid int,linkid int,PRIMARY KEY(id))')
-            self.cursor.execute('create index wordidx on wordlist(word)')
-            self.cursor.execute('create index urlidx on urllist(url)')
-            self.cursor.execute('create index wordurlidx on wordlocation(wordid)')
-            self.cursor.execute('create index urltoidx on link(toid)')
-            self.cursor.execute('create index urlfromidx on link(fromid)')
-            self.dbcommit()
-
+  
+            
     # 计算PageRank值
     def calculatepagerank(self,iterations=20):
         # clear out the current page rank tables
@@ -224,7 +224,8 @@ class searcher:
 
 
 crawler = crawler('searchindex')
-'http://www.bilibili.com/' 'http://www.gdut.edu.cn/' 'https://en.wikipedia.org/wiki/Main_Page'
+'http://www.bilibili.com/' 'http://www.gdut.edu.cn/' 'https://en.wikipedia.org/wiki/Main_Page' 'http://www.lawtime.cn/gongan/city/p1/shenzhen'
+'http://www.junranlaw.com/news1-cylxfs-371.html'
 crawler.crawl(['https://en.wikipedia.org/wiki/Main_Page'])
 
 #searcher = searcher('searchindex')

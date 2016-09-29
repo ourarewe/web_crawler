@@ -15,7 +15,7 @@ print 'start>>>'
 
 # 搜索
 e = searcher('searchindex')
-e.query('war wome')
+e.query('war')
 
 
 print 'finished'
